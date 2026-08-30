@@ -9,17 +9,31 @@ import { ProductVariantGroup, ProductVariantOption } from "@/types";
 // no way to set per-option stock, price, SKU, or image at all. Outputs a
 // hidden JSON input the server action parses directly — no fragile text
 // parsing involved.
+//
+// Also owns "Stock Quantity" now, not the Inventory section — when a
+// product has variants, total stock MUST equal the sum of variant stocks,
+// or the two numbers silently drift out of sync (which is exactly what
+// happened before this fix). So: no variants = a normal editable stock
+// field; any variants = stock is computed live from the options below and
+// locked from direct editing.
 
 function emptyOption(): ProductVariantOption {
-  return { id: nanoid(8), name: "" };
+  return { id: nanoid(8), name: "", stock: 0 };
 }
 
 function emptyGroup(): ProductVariantGroup {
   return { id: nanoid(8), name: "", options: [emptyOption()] };
 }
 
-export function VariantBuilder({ initial }: { initial: ProductVariantGroup[] }) {
-  const [groups, setGroups] = useState<ProductVariantGroup[]>(initial.length ? initial : []);
+export function VariantBuilder({
+  initialGroups,
+  initialStockQuantity,
+}: {
+  initialGroups: ProductVariantGroup[];
+  initialStockQuantity: number;
+}) {
+  const [groups, setGroups] = useState<ProductVariantGroup[]>(initialGroups);
+  const [manualStock, setManualStock] = useState(initialStockQuantity);
 
   function updateGroup(groupId: string, patch: Partial<ProductVariantGroup>) {
     setGroups((gs) => gs.map((g) => (g.id === groupId ? { ...g, ...patch } : g)));
@@ -53,6 +67,12 @@ export function VariantBuilder({ initial }: { initial: ProductVariantGroup[] }) 
     );
   }
 
+  const hasVariants = groups.length > 0;
+  const computedTotal = groups.reduce(
+    (sum, g) => sum + g.options.reduce((s, o) => s + (o.stock ?? 0), 0),
+    0
+  );
+
   // Clean out fully-empty groups/options before serializing, so an unused
   // "Add Variant Group" click doesn't save junk.
   const cleaned = groups
@@ -63,6 +83,26 @@ export function VariantBuilder({ initial }: { initial: ProductVariantGroup[] }) 
   return (
     <div className="space-y-4">
       <input type="hidden" name="variantsJson" value={JSON.stringify(cleaned)} />
+      <input type="hidden" name="stockQuantity" value={hasVariants ? computedTotal : manualStock} />
+
+      <div className="rounded-xl2 border border-white/10 p-4">
+        <div className="text-xs text-white/50 mb-1">Stock Quantity</div>
+        {hasVariants ? (
+          <>
+            <div className="text-2xl font-display font-semibold">{computedTotal}</div>
+            <p className="text-xs text-white/40 mt-1">
+              Auto-calculated as the sum of variant stock below — remove all variant groups to set this manually instead.
+            </p>
+          </>
+        ) : (
+          <input
+            type="number"
+            value={manualStock}
+            onChange={(e) => setManualStock(Number(e.target.value) || 0)}
+            className="input max-w-[160px]"
+          />
+        )}
+      </div>
 
       {groups.map((group) => (
         <div key={group.id} className="rounded-xl2 border border-white/10 p-4">
@@ -71,7 +111,7 @@ export function VariantBuilder({ initial }: { initial: ProductVariantGroup[] }) 
               placeholder="Group name (e.g. Color, Storage)"
               value={group.name}
               onChange={(e) => updateGroup(group.id, { name: e.target.value })}
-              className="input flex-1"
+              className="input flex-1 min-w-0"
             />
             <button type="button" onClick={() => removeGroup(group.id)} className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 shrink-0">
               <Trash2 size={14} />
@@ -133,8 +173,8 @@ function OptionRow({
         <input
           type="number"
           placeholder="Stock"
-          value={option.stock ?? ""}
-          onChange={(e) => onChange({ stock: e.target.value === "" ? undefined : Number(e.target.value) })}
+          value={option.stock ?? 0}
+          onChange={(e) => onChange({ stock: Number(e.target.value) || 0 })}
           className="input w-24 shrink-0"
         />
         <button

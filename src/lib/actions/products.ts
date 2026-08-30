@@ -32,6 +32,15 @@ export async function saveProduct(formData: FormData) {
   const name = formData.get("name") as string;
   const regularPrice = Number(formData.get("regularPrice") || 0);
   const salePriceRaw = formData.get("salePrice") as string;
+  const variantGroups = parseVariantsJson((formData.get("variantsJson") as string) || "");
+
+  // Never trust the client's computed sum for stockQuantity when variants
+  // exist — recompute it the same way, server-side, so the two numbers can
+  // never drift out of sync no matter what the client sends.
+  const stockQuantity =
+    variantGroups.length > 0
+      ? variantGroups.reduce((sum, g) => sum + g.options.reduce((s, o) => s + (o.stock ?? 0), 0), 0)
+      : Number(formData.get("stockQuantity") || 0);
 
   const product: Product = {
     id,
@@ -45,7 +54,7 @@ export async function saveProduct(formData: FormData) {
     regularPrice,
     salePrice: salePriceRaw ? Number(salePriceRaw) : undefined,
     costPrice: formData.get("costPrice") ? Number(formData.get("costPrice")) : undefined,
-    stockQuantity: Number(formData.get("stockQuantity") || 0),
+    stockQuantity,
     trackInventory: formData.get("trackInventory") === "on",
     lowStockThreshold: Number(formData.get("lowStockThreshold") || 5),
     mainImageUrl: formData.get("mainImageUrl") as string,
@@ -65,7 +74,7 @@ export async function saveProduct(formData: FormData) {
         const [label, ...rest] = l.split(":");
         return { label: label.trim(), value: rest.join(":").trim() };
       }),
-    variantGroups: parseVariantsJson((formData.get("variantsJson") as string) || ""),
+    variantGroups,
     tags: ((formData.get("tags") as string) || "").split(",").map((s) => s.trim()).filter(Boolean),
     isFeatured: formData.get("isFeatured") === "on",
     isNewArrival: formData.get("isNewArrival") === "on",

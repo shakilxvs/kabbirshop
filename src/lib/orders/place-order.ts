@@ -155,22 +155,44 @@ export async function placeOrder(input: PlaceOrderInput, settings: StoreSettings
     tx.set(counterRef, { next: current + 1 }, { merge: true });
     const orderNumber = `${orderSettings.numberPrefix}${String(current).padStart(orderSettings.padding, "0")}`;
 
+    // Aggregate all cart items by product first — an order can contain two
+    // different variants of the same product, and applying decrements one
+    // item at a time (each computed from the same stale pre-transaction
+    // `product` snapshot) would silently drop all but the last one. Build
+    // one final, correct stock state per product, then write it once.
+    const quantityByProduct = new Map<string, { total: number; byVariantKey: Map<string, number> }>();
     for (const item of input.items) {
-      const product = productsById.get(item.productId)!;
-      if (!product.trackInventory) continue;
-      const ref = adminDb.collection("products").doc(item.productId);
+      const entry = quantityByProduct.get(item.productId) ?? { total: 0, byVariantKey: new Map() };
+      entry.total += item.quantity;
       if (item.variantKey) {
+        entry.byVariantKey.set(item.variantKey, (entry.byVariantKey.get(item.variantKey) ?? 0) + item.quantity);
+      }
+      quantityByProduct.set(item.productId, entry);
+    }
+
+    for (const [productId, { total, byVariantKey }] of quantityByProduct) {
+      const product = productsById.get(productId)!;
+      if (!product.trackInventory) continue;
+      const ref = adminDb.collection("products").doc(productId);
+
+      // stockQuantity is always kept as the single source of truth for "is this
+      // product in stock" — for variant products it must equal the sum of all
+      // variant stocks, so every order decrements it by the same total
+      // regardless of how many different variants were purchased.
+      const newStockQuantity = Math.max(0, product.stockQuantity - total);
+
+      if (product.variantGroups.length > 0) {
         const groups = product.variantGroups.map((g) => ({
           ...g,
-          options: g.options.map((o) =>
-            o.id === item.variantKey || `${g.id}:${o.id}` === item.variantKey
-              ? { ...o, stock: Math.max(0, (o.stock ?? 0) - item.quantity) }
-              : o
-          ),
+          options: g.options.map((o) => {
+            const optKey = [o.id, `${g.id}:${o.id}`].find((k) => byVariantKey.has(k));
+            if (!optKey) return o;
+            return { ...o, stock: Math.max(0, (o.stock ?? 0) - byVariantKey.get(optKey)!) };
+          }),
         }));
-        tx.update(ref, { variantGroups: groups });
+        tx.update(ref, { variantGroups: groups, stockQuantity: newStockQuantity });
       } else {
-        tx.update(ref, { stockQuantity: Math.max(0, product.stockQuantity - item.quantity) });
+        tx.update(ref, { stockQuantity: newStockQuantity });
       }
     }
 

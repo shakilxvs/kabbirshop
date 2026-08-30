@@ -41,13 +41,13 @@ export async function ProductForm({ product }: { product?: Product }) {
       </Section>
 
       <Section title="Inventory">
-        <div className="grid grid-cols-3 gap-4 items-end">
-          <Field label="Stock Quantity"><input type="number" name="stockQuantity" defaultValue={product?.stockQuantity ?? 0} className="input" /></Field>
+        <div className="grid grid-cols-2 gap-4 items-end">
           <Field label="Low Stock Threshold"><input type="number" name="lowStockThreshold" defaultValue={product?.lowStockThreshold ?? 5} className="input" /></Field>
           <label className="flex items-center gap-2 text-sm pb-2.5">
             <input type="checkbox" name="trackInventory" defaultChecked={product?.trackInventory ?? true} /> Track Inventory
           </label>
         </div>
+        <p className="text-xs text-white/40">Stock Quantity is set in the Variants section below — as a manual number if this product has no variants, or automatically as the sum of variant stock if it does.</p>
       </Section>
 
       <Section title="Media">
@@ -58,12 +58,11 @@ export async function ProductForm({ product }: { product?: Product }) {
         <Field label="Video URL"><input name="videoUrl" defaultValue={product?.videoUrl} className="input" /></Field>
       </Section>
 
-      <Section title="Variants">
+      <Section title="Variants & Stock">
         <p className="text-xs text-white/40 mb-1">
-          Add a group (e.g. "Color"), then its options. Stock is required per option; SKU, image,
-          and price overrides are optional — click the arrow to expand them.
+          Add a group (e.g. "Color"), then its options. SKU, image, and price overrides are optional — click the arrow to expand them.
         </p>
-        <VariantBuilder initial={product?.variantGroups ?? []} />
+        <VariantBuilder initialGroups={product?.variantGroups ?? []} initialStockQuantity={product?.stockQuantity ?? 0} />
       </Section>
 
       <Section title="Product Information">
