@@ -20,7 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-screen bg-[#0B0D10] text-white flex flex-col md:flex-row">
       <AdminMobileNav adminName={adminName} />
 
-      <aside className="w-60 shrink-0 border-r border-white/10 p-4 hidden md:flex md:flex-col sticky top-0 h-screen overflow-y-auto">
+      <aside className="w-60 shrink-0 border-r border-white/10 p-4 hidden md:block">
         <div className="font-display font-semibold px-2 py-3 text-lg">Admin</div>
         <nav className="space-y-1 mt-2">
           {ADMIN_NAV.map(({ href, label, icon }) => {
@@ -37,13 +37,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             );
           })}
         </nav>
-        <div className="mt-auto pt-8">
-          <div className="px-3 text-xs text-white/40">
-            Signed in as
-            <div className="text-white/70 truncate">{adminName}</div>
-          </div>
-          <LogoutButton />
+        <div className="mt-8 px-3 text-xs text-white/40">
+          Signed in as
+          <div className="text-white/70">{adminName}</div>
         </div>
+        <LogoutButton />
       </aside>
       <main className="flex-1 min-w-0 p-4 md:p-8">{children}</main>
     </div>

@@ -93,8 +93,7 @@ export async function seedDefaultData() {
       brand: "Generic", categoryId: "earbuds-headphones",
       shortDescription: "True wireless earbuds with 24hr case battery.",
       description: "Compact true-wireless earbuds with touch controls, punchy bass, and a 24-hour charging case.",
-      regularPrice: 2200, salePrice: 1499, stockQuantity: 40, // = sum of variant stock below (25 + 15)
-      trackInventory: true, lowStockThreshold: 5,
+      regularPrice: 2200, salePrice: 1499, stockQuantity: 40, trackInventory: true, lowStockThreshold: 5,
       mainImageUrl: "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800", galleryImageUrls: [],
       variantGroups: [{ id: "color", name: "Color", options: [{ id: "black", name: "Black", stock: 25 }, { id: "white", name: "White", stock: 15 }] }],
       tags: ["Sale", "Bestseller"], isFeatured: true, isNewArrival: false, isBestseller: true,
